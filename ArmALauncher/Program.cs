@@ -50,28 +50,6 @@ namespace ArmALauncher
             if (showLogWindow != null && showLogWindow != "false")
                 logForm.Show();
 
-            var arma2path = config.Get("arma2path");
-            if (null == arma2path)
-            {
-                arma2path = Helpers.LookupRegistry("main",
-                    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\bohemia interactive studio\\arma 2",
-                    "HKEY_LOCAL_MACHINE\\SOFTWARE\\bohemia interactive studio\\arma 2");
-                if (arma2path != null)
-                    config.Set("arma2path", arma2path);
-                Log("ArmA 2 is at: " + arma2path);
-            }
-
-            var arma2oapath = config.Get("arma2oapath");
-            if (null == arma2oapath)
-            {
-                arma2oapath = Helpers.LookupRegistry("main",
-                    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\bohemia interactive studio\\arma 2 oa",
-                    "HKEY_LOCAL_MACHINE\\SOFTWARE\\bohemia interactive studio\\arma 2 oa");
-                if (arma2oapath != null)               
-                    config.Set("arma2oapath", arma2oapath);
-            }
-            Log("ArmA 2 OA is at: " + arma2oapath);
-
             var arma3path = config.Get("arma3path");
             if (null == arma3path)
             {
@@ -100,6 +78,15 @@ namespace ArmALauncher
             config.Set("additionalArguments", additionalArguments);
 
 
+            // Caminho do mod
+            var modfolder = config.Get("modfolder")+"\\";
+            if (null == modfolder)
+            {
+                config.Set("modfolder", "c:\\diretorio_com_os_mods");
+
+            }
+            Log("Pasta de mods: " + modfolder);
+
             configSource.Save(configFileName);
 
             // Arguments prepended to the launch args. Currently only needed for a3battleye
@@ -110,27 +97,14 @@ namespace ArmALauncher
                 MessageBox.Show("Cannot find ts3. Please edit " + configFileName + " manually.");
                 return;
             }
+           
 
-            var modfolder = config.Get("modfolder");
             if (modfolder == null || !Directory.Exists(modfolder))
             {
                 MessageBox.Show("Não foi possível achar a sua pasta de mods. Edite o " + configFileName + " manualmente.");
                 return;
             }
 
-
-            Process processAceClippi = null;
-            // Start clippy if it isn't running yet
-            if (File.Exists("@ace_ark\\clippi\\aceclippi.exe"))
-            {
-                if (0 == Process.GetProcessesByName("aceclippi").Length)
-                {
-                    processAceClippi = new Process();
-                    ProcessStartInfo startInfo = new ProcessStartInfo();
-                    startInfo.FileName = "@ace_ark\\clippi\\aceclippi.exe";
-                    processAceClippi.StartInfo = startInfo;
-                }
-            }
 
             if (va.Length < 1)
             {
@@ -144,37 +118,7 @@ namespace ArmALauncher
 
             string mod = "";
 
-            if (va[0] == "arma2")
-            {
-                if (arma2path == null || !Directory.Exists(arma2path))
-                {
-                    MessageBox.Show("Cannot find arma2. Please edit " + configFileName + " manually.");
-                    return;
-                }
-
-                if (arma2oapath == null || !Directory.Exists(arma2oapath))
-                {
-                    MessageBox.Show("Cannot find arma2oa. Please edit " + configFileName + " manually.");
-                    return;
-                }
-
-                DeployUserconfig(arma2oapath);
-                DeployTS3DLL("@acre", ts3path, "acre_");
-
-                mod = arma2path + ";expansion";
-
-                if (Directory.Exists("beta"))
-                {
-                    mod += ";" + Path.GetFullPath("beta");
-                    mod += ";" + Path.GetFullPath("beta") + "\\expansion";
-                    pProcess.StartInfo.FileName = Path.GetFullPath("beta") + "\\arma2oa.exe";
-                }
-                else
-                    pProcess.StartInfo.FileName = arma2oapath + "\\arma2oa.exe";
-
-                pProcess.StartInfo.WorkingDirectory = arma2oapath;                
-            }
-            else if (va[0] == "arma3")
+            if (va[0] == "arma3")
             {
                 if (arma3path == null || !Directory.Exists(arma3path))
                 {
@@ -199,15 +143,18 @@ namespace ArmALauncher
             }
 
             if (va.Length > 0)
-                mod += ";" + modfolder + va[1];
+                for (var i = 1; i < va.Length; i++)
+                {
+                    if (i == 1)
+                        mod += modfolder + va[i];
+                    else
+                        mod += ";" + modfolder + va[i];
+                }
 
-          
+                    
 
             string args = additionalArguments + " ";
             args += "\"-mod="+ mod + "\"";
-
-            for (int i = 2; i < va.Length; i++)
-                args += " " + va[i];
 
             pProcess.StartInfo.Arguments = preArgs + args;
             pProcess.StartInfo.UseShellExecute = false;
@@ -219,31 +166,12 @@ namespace ArmALauncher
 
             try
             {
-                if (processAceClippi != null)
-                    processAceClippi.Start(); 
+                
 
-                //pProcess.Start();
+                pProcess.Start();
                 Log("Waiting for ArmA to exit.");
                 pProcess.WaitForExit();
-
-                if (processAceClippi != null && !processAceClippi.HasExited)
-                {
-                    processAceClippi.CloseMainWindow();
-                    for (int i = 0; i < 5; i++)
-                    {
-                        Log("Waiting for ACE Clippi to exit .. " + (4-i));
-                        Thread.Sleep(1000);
-                        if (processAceClippi.HasExited)
-                            break;
-                    }
-                    if (!processAceClippi.HasExited)
-                    {
-                        Log("Force-killing it.");
-                        processAceClippi.Kill();
-
-                    }
-                    processAceClippi.WaitForExit();
-                }
+                                
             }
             catch (Exception e)
             {
